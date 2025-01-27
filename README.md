@@ -3,6 +3,8 @@ Corresponding functions to research:
 
 Specificity landscapes of 40 R2R3-MYBs reveal how paralogs target different cis-elements by homodimeric binding
 
+This research mainly includes the following analyses:
+
 - Data Analyses of DAP-seq: Corresponding functions of DAP-seq analyses in R.
 
 - Data Analyses of HT-SELEX: Corresponding functions of HT-SELEX analyses in R.
