@@ -1,0 +1,143 @@
+# Dimeric Consensus Enrichment (DAPseq, Figure 2B)
+dimer_enrich <- function(seqs, direct = c("DR", "IR", "ER"), half_pattern = "TTGAC", max_mismatch = 0, gap = 0:20, bk_div = TRUE, bk_div_pseudo = 200, isNeedShuffled = TRUE, shuffled_seqs = "seqs", shuffled_n = 1){
+  if (bk_div) {if (isNeedShuffled) { # bk_div为TURE时，将目标序列Kmer频率除以背景序列Kmer频率，表明要计算的是富集程度；isNeedShuffled为TURE时，表明需要随机打乱背景序列，否则需要提供背景序列
+    shuffled_seqs <- shuffle_sequences(DNAStringSet(seqs) %>% rep(shuffled_n))
+    cat("Shuffle is done !!\n")
+  } else {shuffled_seqs <- shuffled_seqs}}
+  
+  # 简并碱基转换
+  str_to_Degen <- function(degen) {
+    Degener <- list(R = "AG", Y = "CT", M = "AC", K = "GT", S = "CG", W = "AT", H = "ACT", 
+                    B = "CGT", V = "ACG", D = "AGT", N = "ACGT")
+    if (nchar(degen) == 1) {
+      Base <- Degener[degen]
+    } else {
+      degen_vec <- sort(unique(unlist(str_split(degen, ""))))
+      degen_ <- unlist(Degener[degen_vec])
+      degen_ <- unlist(str_split(degen_, ""))
+      ##
+      ACGT <- c("A", "C", "G", "T")[match(degen_vec, c("A", "C", "G", "T"))]
+      ACGT <- ACGT[!is.na(ACGT)]
+      ACGT <- paste(sort(unique(c(degen_, ACGT))), collapse = "")
+      Base <- Degener[Degener == ACGT]
+    }
+    return(Base)
+  }
+  
+  # 当所需二聚体间隔存在负值时使用该函数
+  pattern_neg <- function(str, str_, gap) {
+    if ((-gap %% 2) == 1) {
+      middle <- paste(unlist(str_split(str, ""))[nchar(str) - ceiling(-gap / 2) + 1], 
+                      unlist(str_split(str_, ""))[ceiling(-gap / 2)], sep = "", collapse = "") %>% str_to_Degen() %>% names()
+      patterns <- paste0(substr(str, 1, nchar(str) - ceiling(-gap / 2)), middle, 
+                         substr(str_, ceiling(-gap / 2) + 1, nchar(str_)))
+    } else {
+      patterns <- paste0(substr(str, 1, nchar(str) - ceiling(-gap / 2)), 
+                         substr(str_, ceiling(-gap / 2) + 1, nchar(str_)))
+    }
+    return(patterns)
+  }
+  
+  # 归纳所有二聚体共识序列(consensus)，并计算kmer频率，以及背景校正
+  cnt_direction <- function(direct = "DR") 
+  {
+    patterns <- case_when( # 归纳consensus
+      direct == "DR" ~ c(sapply(gap[gap < 0], function(x) pattern_neg(half_pattern, half_pattern, x)), 
+                         stringr::str_c(half_pattern, strrep("N", gap[gap >= 0]), half_pattern)) %>% unlist(), 
+      direct == "IR" ~ c(sapply(gap[gap < 0], function(x) pattern_neg(revComp(half_pattern), half_pattern, x)), 
+                         stringr::str_c(half_pattern %>% revComp(), strrep("N", gap[gap >= 0]), half_pattern)) %>% unlist(), 
+      direct == "ER" ~ c(sapply(gap[gap < 0], function(x) pattern_neg(half_pattern, revComp(half_pattern), x)), 
+                         stringr::str_c(half_pattern, strrep("N", gap[gap >= 0]), half_pattern %>% revComp())) %>% unlist()
+    )
+    # 统计consensus出现频率
+    fg_cnt <- vcountPDict(pdict = patterns %>% DNAStringSet(), subject = seqs %>% DNAStringSet(), fixed = "subject", max.mismatch = max_mismatch) %>% rowSums()
+    cat("Counting for", direct, "are done !!\n")
+    if (bk_div) { # 需要背景校正
+      bk_cnt <- vcountPDict(pdict = patterns %>% DNAStringSet(), subject = shuffled_seqs, fixed = "subject", max.mismatch = max_mismatch) %>% rowSums()
+      cat("Background counting", direct, "are done !!\n")
+      bk_cnt <- bk_cnt / shuffled_n
+      fg_cnt <- (fg_cnt - bk_cnt) / (bk_cnt + bk_div_pseudo)
+    }
+    fg_cnt
+  }
+  lapply(direct, function(x){cnt_direction(direct = x)}) %>% set_names(direct) %>% largeListToDf() %>% mutate(gap = gap)
+}
+
+# Motif Enrichment (DAPseq, Figure 3C, S4A)
+# 富集程度函数定义
+# 计算motif富集程度
+motif_enrich <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores", pseudo = 1, shuffled_n = 1) 
+{
+  ## 转变矩阵为PWMatrixList
+  if (!is(pwmlist, "PWMatrixList")) 
+    pwmlist <- do.call(PWMatrixList, pwmlist)
+  ## 读取序列
+  if (typeof(seqs) == "character" && length(seqs) == 1) {
+    dnaseq <- getSeq_fqfachrFile(seqs) %>% DNAStringSet
+    cat(seqs, " are your input file.\n")
+  } else if (is(seqs, "DNAStringSet")) {
+    dnaseq <- seqs; cat("DNAStringSet are ready.\n") 
+  }
+  
+  ## 统计motif在DAP peak中的出现次数
+  motif_ix_SummarizedExperiment <- matchMotifs(pwmlist, dnaseq, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct <- motifCounts(motif_ix_SummarizedExperiment) %>% Matrix::colSums()
+  motif_ct[motif_ct <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency are finished!\n")
+  
+  ## 随机打乱peak并统计motif出现次数
+  dnaseqShuffled <- shuffle_sequences(dnaseq %>% rep(shuffled_n))
+  motif_ix_SummarizedExperiment_Shuffled <- matchMotifs(pwmlist, dnaseqShuffled, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_Shuffled <- motifCounts(motif_ix_SummarizedExperiment_Shuffled) %>% Matrix::colSums()
+  motif_ct_Shuffled[motif_ct_Shuffled <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency in background sequences are finished!\n")
+  
+  ## 计算motif富集程度
+  motifEnrich <- motif_ct / motif_ct_Shuffled
+  motifEnrich[motifEnrich <= 1e-06] <- 1e-06
+  return(list(motifEnrich = motifEnrich, motif_count = motif_ct, motif_count_bg = motif_ct_Shuffled))
+}
+
+# Precision-Recall Analysis (Figure 4C-E, S5D-E)
+# 定义函数计算PR曲线的Precision和Recall
+cppFunction('
+    NumericMatrix calcPredictions(std::vector<double> Peak, std::vector<double> Non_Peak, std::vector<double> Thresh) {
+        
+        // Peak:表示位于peak区域的match最大分数，Non_Peak:表示位于非peak区域的match最大分数
+        // Thresh:表示阈值(一般为所有分数的最小值~最大值)
+        
+        NumericMatrix DataPR(Thresh.size(), 2);
+        
+        // 遍历所有阈值并计算PR曲线坐标
+        for (int ind = 0; ind < Thresh.size(); ++ind) {
+            int TP = 0;
+            int FP = 0;
+            int FN = 0;
+            
+            // TRUE的意思是片段X的match最大分数大于等于阈值，且位于peak区域；或match最大分数小于阈值，且位于非peak区域
+            // 既位于peak区域，同时match最大分数又大于等于阈值(Positive)
+            TP = std::count_if(Peak.begin(), Peak.end(), [&](double peak) { return peak >= Thresh[ind]; });
+            
+            // 虽位于非peak区域，但match最大分数又大于等于阈值(Positive)
+            // (注:转折就是FALSE)
+            FP = std::count_if(Non_Peak.begin(), Non_Peak.end(), [&](double non_peak) { return non_peak >= Thresh[ind]; });
+            
+            // 虽位于peak区域，但match最大分数小于阈值(Negtive)
+            // (注:转折就是FALSE)
+            FN = std::count_if(Peak.begin(), Peak.end(), [&](double peak) { return peak < Thresh[ind]; });
+            
+            // 计算同一阈值对应的Precision和Recall
+            double Precision = 0.0;
+            double Recall = 0.0;
+            Precision = static_cast<double> (TP) / (TP + FP);
+            Recall = static_cast<double> (TP) / (TP + FN);
+            
+            // 记录PR曲线坐标
+            DataPR(ind, 0) = Precision;
+            DataPR(ind, 1) = Recall;
+        }
+        
+        return DataPR;
+    }
+')
+
