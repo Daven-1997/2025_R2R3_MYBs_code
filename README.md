@@ -7,6 +7,6 @@ Specificity landscapes of 40 R2R3-MYBs reveal how paralogs target different cis-
 
 - Data Analyses of HT-SELEX: Corresponding functions of HT-SELEX analyses in R.
 
-RNA-seq and Data Analyses: Corresponding functions of RNA-seq analyses in R.
+- RNA-seq and Data Analyses: Corresponding functions of RNA-seq analyses in R.
 
-Statistical Analyses: Corresponding functions of statistical analyses in R.
+- Statistical Analyses: Corresponding functions of statistical analyses in R.
