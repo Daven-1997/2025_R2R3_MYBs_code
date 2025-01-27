@@ -1,0 +1,184 @@
+# Dimeric Consensus Enrichment (Figure 2A和Figure S3A)
+dimer_enrich <- function(seqs, direct = c("DR", "IR", "ER"), half_pattern = "TTGAC", max_mismatch = 0, gap = 0:20, bk_div = TRUE, bk_div_pseudo = 200, isNeedShuffled = TRUE, shuffled_seqs = "seqs", shuffled_n = 1){
+  if (bk_div) {if (isNeedShuffled) { # bk_div为TURE时，将目标序列Kmer频率除以背景序列Kmer频率，表明要计算的是富集程度；isNeedShuffled为TURE时，表明需要随机打乱背景序列，否则需要提供背景序列
+    shuffled_seqs <- shuffle_sequences(DNAStringSet(seqs) %>% rep(shuffled_n))
+    cat("Shuffle is done !!\n")
+  } else {shuffled_seqs <- shuffled_seqs}}
+  
+  # 简并碱基转换
+  str_to_Degen <- function(degen) {
+    Degener <- list(R = "AG", Y = "CT", M = "AC", K = "GT", S = "CG", W = "AT", H = "ACT", 
+                    B = "CGT", V = "ACG", D = "AGT", N = "ACGT")
+    if (nchar(degen) == 1) {
+      Base <- Degener[degen]
+    } else {
+      degen_vec <- sort(unique(unlist(str_split(degen, ""))))
+      degen_ <- unlist(Degener[degen_vec])
+      degen_ <- unlist(str_split(degen_, ""))
+      ##
+      ACGT <- c("A", "C", "G", "T")[match(degen_vec, c("A", "C", "G", "T"))]
+      ACGT <- ACGT[!is.na(ACGT)]
+      ACGT <- paste(sort(unique(c(degen_, ACGT))), collapse = "")
+      Base <- Degener[Degener == ACGT]
+    }
+    return(Base)
+  }
+  
+  # 当所需二聚体间隔存在负值时使用该函数
+  pattern_neg <- function(str, str_, gap) {
+    if ((-gap %% 2) == 1) {
+      middle <- paste(unlist(str_split(str, ""))[nchar(str) - ceiling(-gap / 2) + 1], 
+                      unlist(str_split(str_, ""))[ceiling(-gap / 2)], sep = "", collapse = "") %>% str_to_Degen() %>% names()
+      patterns <- paste0(substr(str, 1, nchar(str) - ceiling(-gap / 2)), middle, 
+                         substr(str_, ceiling(-gap / 2) + 1, nchar(str_)))
+    } else {
+      patterns <- paste0(substr(str, 1, nchar(str) - ceiling(-gap / 2)), 
+                         substr(str_, ceiling(-gap / 2) + 1, nchar(str_)))
+    }
+    return(patterns)
+  }
+  
+  # 归纳所有二聚体共识序列(consensus)，并计算kmer频率，以及背景校正
+  cnt_direction <- function(direct = "DR") 
+  {
+    patterns <- case_when( # 归纳consensus
+      direct == "DR" ~ c(sapply(gap[gap < 0], function(x) pattern_neg(half_pattern, half_pattern, x)), 
+                         stringr::str_c(half_pattern, strrep("N", gap[gap >= 0]), half_pattern)) %>% unlist(), 
+      direct == "IR" ~ c(sapply(gap[gap < 0], function(x) pattern_neg(revComp(half_pattern), half_pattern, x)), 
+                         stringr::str_c(half_pattern %>% revComp(), strrep("N", gap[gap >= 0]), half_pattern)) %>% unlist(), 
+      direct == "ER" ~ c(sapply(gap[gap < 0], function(x) pattern_neg(half_pattern, revComp(half_pattern), x)), 
+                         stringr::str_c(half_pattern, strrep("N", gap[gap >= 0]), half_pattern %>% revComp())) %>% unlist()
+    )
+    # 统计consensus出现频率
+    fg_cnt <- vcountPDict(pdict = patterns %>% DNAStringSet(), subject = seqs %>% DNAStringSet(), fixed = "subject", max.mismatch = max_mismatch) %>% rowSums()
+    cat("Counting for", direct, "are done !!\n")
+    if (bk_div) { # 需要背景校正
+      bk_cnt <- vcountPDict(pdict = patterns %>% DNAStringSet(), subject = shuffled_seqs, fixed = "subject", max.mismatch = max_mismatch) %>% rowSums()
+      cat("Background counting", direct, "are done !!\n")
+      bk_cnt <- bk_cnt / shuffled_n
+      fg_cnt <- (fg_cnt - bk_cnt) / (bk_cnt + bk_div_pseudo)
+    }
+    fg_cnt
+  }
+  lapply(direct, function(x){cnt_direction(direct = x)}) %>% set_names(direct) %>% largeListToDf() %>% mutate(gap = gap)
+}
+
+# Motif Frequency and Information Content (Figure 2C)
+# 定义函数用于计算motif出现频率并标准化
+motif_freq_norm <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores")
+{
+  ## 转变矩阵为PWMatrixList
+  if (!is(pwmlist, "PWMatrixList"))
+    pwmlist <- do.call(TFBSTools::PWMatrixList, pwmlist)
+  ## 读取序列
+  if (typeof(seqs) == "character" && length(seqs) == 1) {
+    dnaseq <- fjComm::getSeq_fqfachrFile(seqs) %>% DNAStringSet
+    cat(seqs, " are your input file.\n")
+  } else if (is(seqs, "DNAStringSet")) {
+    dnaseq <- seqs; cat("DNAStringSet are ready.\n")
+  }
+
+  # perform motif match and calculate motif frequency
+  motif_ix_SummarizedExperiment <- matchMotifs(pwmlist, dnaseq, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct <- motifCounts(motif_ix_SummarizedExperiment) %>% Matrix::colSums()
+  motif_ffr <- motif_ct / length(dnaseq)
+
+  ## reverse complement
+  PWMlist_rc <- suppressMessages(do.call(PWMatrixList, motif_rc(pwmlist) %>% convert_motifs("TFBSTools-PWMatrix")))
+  motif_ix_SummarizedExperiment_rc <- matchMotifs(PWMlist_rc, dnaseq, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_rc <- motifCounts(motif_ix_SummarizedExperiment_rc) %>% Matrix::colSums()
+  motif_ffr_rc <- motif_ct_rc / length(dnaseq)
+  motif_ffr <- (motif_ffr + motif_ffr_rc) / 2
+  cat("Calculation for motif frequency are finished!\n")
+
+  # generate background sequences with the same 1-nt frequency
+  # perform motif match and calculate motif frequency in background
+  ntfreq <- alphabetFrequency(dnaseq, baseOnly = TRUE, collapse = TRUE) %>% prop.table()
+  seq_len_multi <- width(dnaseq) %>% tabulate() %>% which.max()
+  seqnons <- create_sequences(seqnum = length(dnaseq), seqlen = seq_len_multi, freqs = ntfreq[c("A", "C", "G", "T")])
+  motif_ix_SummarizedExperiment_nomr <- matchMotifs(pwmlist, seqnons, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_nomr <- motifCounts(motif_ix_SummarizedExperiment_nomr) %>% Matrix::colSums()
+  motif_ffr_nomr <- motif_ct_nomr / length(seqnons)
+
+  ## random reverse complement
+  motif_ix_SummarizedExperiment_nomr_rc <- matchMotifs(PWMlist_rc, seqnons, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_nomr_rc <- motifCounts(motif_ix_SummarizedExperiment_nomr_rc) %>% Matrix::colSums()
+  motif_ffr_nomr_rc <- motif_ct_nomr_rc / length(seqnons)
+  motif_ffr_nomr <- (motif_ffr_nomr + motif_ffr_nomr_rc) / 2
+  cat("Calculation for motif frequency in background sequences are finished!\n")
+
+  # remove background influence
+  motif_deno <- motif_ffr - motif_ffr_nomr
+  motif_deno[motif_deno <= 1e-06] <- 1e-06
+  return(motif_deno)
+
+  ## motif length normalization
+  # mot_len <- purrr::map(pwmlist, length) %>% unlist()
+  # motif_freqs <- motif_deno / ((seq_len_multi - mot_len + 1) / seq_len_multi)
+  # return(motif_freqs)
+}
+
+# 定义函数计算motif出现频率及信息含量并指定绘图保存路径
+freqMeanICalFun <- function(Cleanfile, pwmlist, tf_name, p.cutoff = 1e-05, bg = "even",
+                            out = "scores", freqColours = colorspace::sequential_hcl(9, "BluYl", rev = T),
+                            width = 6, height = 12, ICColours = colorspace::sequential_hcl(9, "PinkYl", rev = T),
+                            outDir = "/wrk/chenhao/work/paper_all/motif_collect/motif_collect_other_MYB/") {
+  ## 频率计算
+  motifFreq <- motif_freq_norm(Cleanfile, pwmlist, p.cutoff = p.cutoff, bg = bg, out = out) %>% as.data.frame()
+  if (!is.null(names(pwmlist))) {
+    motifFreq$mot_name <- names(pwmlist) %>% factor(levels = rev(names(pwmlist)))
+  } else { motifFreq$mot_name <- paste0(tf_name, seq_along(pwmlist)) }
+
+  ## 频率绘图
+  motifFreq$mot_name <- names(pwmlist) %>% factor(levels = rev(names(pwmlist)))
+  colnames(motifFreq)[1] <- "value"; motifFreq$tf_name <- tf_name
+  freqPlot <- ggplot(motifFreq, aes(x = tf_name, y = mot_name, fill = log2(value))) + geom_tile() + scale_fill_gradientn(colours = freqColours, space = "Lab", name = "Log2 Frequency")
+
+  gg_save_pdf(freqPlot, width, height, outDir, paste0("motiFreq_heatmap_log2_", tf_name))
+
+  ## 信息含量计算并绘图
+  ICmatrixlist <- convert_motifs(pwmlist, "TFBSTools-ICMatrix") %>% suppressMessages
+  motifIC <- (sapply(ICmatrixlist, function(IC) sum(IC@profileMatrix) ) %>% unlist()) / (map(ICmatrixlist, length) %>% unlist())
+  motifIC <- data.frame(ICPos = motifIC, ICName = tf_name, Mot_Name = motifFreq$mot_name)
+  ICPlot <- ggplot(motifIC, aes(x = ICName, y = Mot_Name, fill = ICPos)) + geom_tile() + scale_fill_gradientn(colours = ICColours, space = "Lab", name = "Mean IC")
+
+  gg_save_pdf(ICPlot, width, height, outDir, paste0("IC_heatmap_", tf_name))
+
+  ##
+  return(list(motifFreq = motifFreq, motifIC = motifIC))
+}
+
+# Motif Enrichment (Figure 2F, 3A)
+# 计算motif富集程度
+motif_enrich <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores", pseudo = 1, shuffled_n = 1) 
+{
+  ## 转变矩阵为PWMatrixList
+  if (!is(pwmlist, "PWMatrixList")) 
+    pwmlist <- do.call(PWMatrixList, pwmlist)
+  ## 读取序列
+  if (typeof(seqs) == "character" && length(seqs) == 1) {
+    dnaseq <- getSeq_fqfachrFile(seqs) %>% DNAStringSet
+    cat(seqs, " are your input file.\n")
+  } else if (is(seqs, "DNAStringSet")) {
+    dnaseq <- seqs; cat("DNAStringSet are ready.\n") 
+  }
+  
+  ## 统计motif在DAP peak中的出现次数
+  motif_ix_SummarizedExperiment <- matchMotifs(pwmlist, dnaseq, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct <- motifCounts(motif_ix_SummarizedExperiment) %>% Matrix::colSums()
+  motif_ct[motif_ct <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency are finished!\n")
+  
+  ## 随机打乱peak并统计motif出现次数
+  dnaseqShuffled <- shuffle_sequences(dnaseq %>% rep(shuffled_n))
+  motif_ix_SummarizedExperiment_Shuffled <- matchMotifs(pwmlist, dnaseqShuffled, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_Shuffled <- motifCounts(motif_ix_SummarizedExperiment_Shuffled) %>% Matrix::colSums()
+  motif_ct_Shuffled[motif_ct_Shuffled <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency in background sequences are finished!\n")
+  
+  ## 计算motif富集程度
+  motifEnrich <- motif_ct / motif_ct_Shuffled
+  motifEnrich[motifEnrich <= 1e-06] <- 1e-06
+  return(list(motifEnrich = motifEnrich, motif_count = motif_ct, motif_count_bg = motif_ct_Shuffled))
+}
+
