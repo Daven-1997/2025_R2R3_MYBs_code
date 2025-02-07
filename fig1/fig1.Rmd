@@ -1,1 +1,37 @@
+# fig1A
+MYBs <- list(SELEX = SELEX_genes, DAP = DAP_genes, PBM = PBM_genes)
+vennList <- draw.triple.venn(length(MYBs$SELEX), length(MYBs$DAP), length(MYBs$PBM), n12 = length(intersect(MYBs$SELEX, MYBs$DAP)), n23 = length(intersect(MYBs$DAP, MYBs$PBM)), n13 = length(intersect(MYBs$SELEX, MYBs$PBM)), n123 = length(intersect(intersect(MYBs$SELEX, MYBs$DAP), MYBs$PBM)), fill = c("#6c6e71", "#d3cea7", "#C0BFE3"), col = NA, cat.fontfamily = 'Helvetica', cat.cex = 0.6, fontfamily = 'Helvetica', cex = 0.6, alpha = 0.6)
+pdf("SELEX_DAP_PBMvenn.pdf", 1.4, 1.4)
+grid.draw(venn.diagram(MYBs, filename = NULL, col = NA, 
+                       fill = c("#6c6e71", "#d3cea7", "#C0BFE3"), euler.d = TRUE, cat.fontfamily = 'Helvetica', 
+                       cat.cex = 0.6, fontfamily = 'Helvetica', cex = 0.6, alpha = 0.6))
+dev.off()
+
+# fig1B
+# 文库内是否含有二聚体或单体统计
+dataQC <- read_xlsx("DAP_SELEX_pie_statistical.xlsx", sheet = 1) %>% data.frame()
+rownames(dataQC) <- dataQC$...1
+dataQC <- dataQC[-3, -c(1:2)] %>% t
+dataQC[1,] <- dataQC[1,] - dataQC[2,]
+dataQC <- reshape2::melt(dataQC)
+Data_signal_QC <- ggplot(dataQC, aes(factor(Var2, levels = c("SELEX", "DAP")), value, fill = factor(Var1, levels = c("Dimer", "Monomer", "None")))) + 
+  geom_bar(stat = "identity", position = "stack", width = 0.6) + 
+  labs(y = "Numbers") + 
+  gg_theme_Publication() + 
+  theme(axis.title.x = element_blank()) + 
+  scale_fill_manual(values = c("#f9b2ac", "#b1ccdc", "#dcdddd"), name = "Type")
+
+# fig1C
+# 鉴定到各转录因子含有二聚体数量统计
+Dimer_statistical <- read_xlsx("Dimer_statistical.xlsx")
+t.test(Dimer_statistical$SELEX, Dimer_statistical$DAP)
+Dimer_statistical <- melt(Dimer_statistical)
+Dimer_plot <- ggplot(Dimer_statistical, aes(variable, value, fill = variable)) + 
+  geom_boxplot(width = 0.6, position = position_identity(), outlier.size = 0.1, lwd = 0.4) +
+  # geom_jitter(shape = 16, position = position_jitter(0.2), size = 0.5) + 
+  gg_theme_Publication() + 
+  labs(y = "Dimer counts") + 
+  theme(axis.title.x = element_blank()) + 
+  scale_fill_manual(values = c("#6c6e71", "#d3cea7"))
+
 
