@@ -1,4 +1,4 @@
-# Gene Track绘图函数 (Figure 5E, 6F)
+# Gene Track绘图函数 (fig5E, 6F)
 geneSegTrackPlot <- function(DataList, Motif, p.cutoff = 5e-05, TargetGene = "AT1G76550", DataType = c(rep("DAP-seq", 3), rep("RNA-seq", 4)), DAP_yMax = NULL, RNA_yMax = NULL, DAP_fill = "#438AC9", DAP_color = "#7F8283", RNA_fill = "#EF9393", RNA_color = "#7F8283", DataName = c("MYB2", "MYB57", "MYB79", "Control", "MYB2", "MYB57", "MYB79"), pdfFile = "/wrk/chenhao/work/MYB2_2023/RNA_MYB57_79/AT1G76550.pdf", pdf_width = 4, pdf_heigth = 1.8, genome = "/wrk/data/genome/yz_genome_data/aragenome/ara.fa", gffFile = "/wrk/data/genome/yz_genome_data/aragenome/Athaliana.gff3") {
   ## 基因注释信息
   GFF3 <- rtracklayer::import(gffFile) %>% as.data.frame()
