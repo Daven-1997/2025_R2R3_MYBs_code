@@ -1,4 +1,4 @@
-# Motif Enrichment (Figure 2F, 3A)
+# Motif Enrichment (fig2F, 3A)
 # 计算motif富集程度
 motif_enrich <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores", pseudo = 1, shuffled_n = 1) 
 {
