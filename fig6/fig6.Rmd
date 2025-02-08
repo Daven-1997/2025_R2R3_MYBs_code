@@ -1,1 +1,11 @@
+# Wilcoxon signed-rank test
+# set1表明PR曲线一组值, set2表明另一条PR曲线一组值, 这两组值的x取值相同, 仅y轴数值为各自预测数值
+wilcox.test(set1, set2)
 
+# Fisher’s Exact Test
+Mat = matrix(c(DAPseq peaks, RNAseq UP genes, DAP_intersection_RNAUP genes, Total genes), ncol = 2)
+fisher.test(Mat)
+
+# T-tests
+# set1表明同一处理不同重复数值, set2表明另一种处理不同重复数值, 这两组值数量相同, 数值为各自所测数值
+t.test(set1, set2)
