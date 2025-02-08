@@ -1,1 +1,42 @@
-
+# Precision-Recall Analysis (Figure 4C-E, S5D-E)
+# 定义函数计算PR曲线的Precision和Recall
+cppFunction('
+    NumericMatrix calcPredictions(std::vector<double> Peak, std::vector<double> Non_Peak, std::vector<double> Thresh) {
+        
+        // Peak:表示位于peak区域的match最大分数，Non_Peak:表示位于非peak区域的match最大分数
+        // Thresh:表示阈值(一般为所有分数的最小值~最大值)
+        
+        NumericMatrix DataPR(Thresh.size(), 2);
+        
+        // 遍历所有阈值并计算PR曲线坐标
+        for (int ind = 0; ind < Thresh.size(); ++ind) {
+            int TP = 0;
+            int FP = 0;
+            int FN = 0;
+            
+            // TRUE的意思是片段X的match最大分数大于等于阈值，且位于peak区域；或match最大分数小于阈值，且位于非peak区域
+            // 既位于peak区域，同时match最大分数又大于等于阈值(Positive)
+            TP = std::count_if(Peak.begin(), Peak.end(), [&](double peak) { return peak >= Thresh[ind]; });
+            
+            // 虽位于非peak区域，但match最大分数又大于等于阈值(Positive)
+            // (注:转折就是FALSE)
+            FP = std::count_if(Non_Peak.begin(), Non_Peak.end(), [&](double non_peak) { return non_peak >= Thresh[ind]; });
+            
+            // 虽位于peak区域，但match最大分数小于阈值(Negtive)
+            // (注:转折就是FALSE)
+            FN = std::count_if(Peak.begin(), Peak.end(), [&](double peak) { return peak < Thresh[ind]; });
+            
+            // 计算同一阈值对应的Precision和Recall
+            double Precision = 0.0;
+            double Recall = 0.0;
+            Precision = static_cast<double> (TP) / (TP + FP);
+            Recall = static_cast<double> (TP) / (TP + FN);
+            
+            // 记录PR曲线坐标
+            DataPR(ind, 0) = Precision;
+            DataPR(ind, 1) = Recall;
+        }
+        
+        return DataPR;
+    }
+')
