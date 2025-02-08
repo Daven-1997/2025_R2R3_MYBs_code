@@ -1,1 +1,68 @@
+# Motif Enrichment (Figure 2F, 3A)
+# 计算motif富集程度
+motif_enrich <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores", pseudo = 1, shuffled_n = 1) 
+{
+  ## 转变矩阵为PWMatrixList
+  if (!is(pwmlist, "PWMatrixList")) 
+    pwmlist <- do.call(PWMatrixList, pwmlist)
+  ## 读取序列
+  if (typeof(seqs) == "character" && length(seqs) == 1) {
+    dnaseq <- getSeq_fqfachrFile(seqs) %>% DNAStringSet
+    cat(seqs, " are your input file.\n")
+  } else if (is(seqs, "DNAStringSet")) {
+    dnaseq <- seqs; cat("DNAStringSet are ready.\n") 
+  }
+  
+  ## 统计motif在DAP peak中的出现次数
+  motif_ix_SummarizedExperiment <- matchMotifs(pwmlist, dnaseq, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct <- motifCounts(motif_ix_SummarizedExperiment) %>% Matrix::colSums()
+  motif_ct[motif_ct <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency are finished!\n")
+  
+  ## 随机打乱peak并统计motif出现次数
+  dnaseqShuffled <- shuffle_sequences(dnaseq %>% rep(shuffled_n))
+  motif_ix_SummarizedExperiment_Shuffled <- matchMotifs(pwmlist, dnaseqShuffled, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_Shuffled <- motifCounts(motif_ix_SummarizedExperiment_Shuffled) %>% Matrix::colSums()
+  motif_ct_Shuffled[motif_ct_Shuffled <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency in background sequences are finished!\n")
+  
+  ## 计算motif富集程度
+  motifEnrich <- motif_ct / motif_ct_Shuffled
+  motifEnrich[motifEnrich <= 1e-06] <- 1e-06
+  return(list(motifEnrich = motifEnrich, motif_count = motif_ct, motif_count_bg = motif_ct_Shuffled))
+}
 
+# Motif Enrichment (DAPseq, Figure 3C, S4A)
+# 富集程度函数定义
+# 计算motif富集程度
+motif_enrich <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores", pseudo = 1, shuffled_n = 1) 
+{
+  ## 转变矩阵为PWMatrixList
+  if (!is(pwmlist, "PWMatrixList")) 
+    pwmlist <- do.call(PWMatrixList, pwmlist)
+  ## 读取序列
+  if (typeof(seqs) == "character" && length(seqs) == 1) {
+    dnaseq <- getSeq_fqfachrFile(seqs) %>% DNAStringSet
+    cat(seqs, " are your input file.\n")
+  } else if (is(seqs, "DNAStringSet")) {
+    dnaseq <- seqs; cat("DNAStringSet are ready.\n") 
+  }
+  
+  ## 统计motif在DAP peak中的出现次数
+  motif_ix_SummarizedExperiment <- matchMotifs(pwmlist, dnaseq, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct <- motifCounts(motif_ix_SummarizedExperiment) %>% Matrix::colSums()
+  motif_ct[motif_ct <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency are finished!\n")
+  
+  ## 随机打乱peak并统计motif出现次数
+  dnaseqShuffled <- shuffle_sequences(dnaseq %>% rep(shuffled_n))
+  motif_ix_SummarizedExperiment_Shuffled <- matchMotifs(pwmlist, dnaseqShuffled, p.cutoff = p.cutoff, bg = bg, out = out)
+  motif_ct_Shuffled <- motifCounts(motif_ix_SummarizedExperiment_Shuffled) %>% Matrix::colSums()
+  motif_ct_Shuffled[motif_ct_Shuffled <= pseudo] <- pseudo ## 较小值加pseudo，避免0值
+  cat("Calculation for motif frequency in background sequences are finished!\n")
+  
+  ## 计算motif富集程度
+  motifEnrich <- motif_ct / motif_ct_Shuffled
+  motifEnrich[motifEnrich <= 1e-06] <- 1e-06
+  return(list(motifEnrich = motifEnrich, motif_count = motif_ct, motif_count_bg = motif_ct_Shuffled))
+}
