@@ -14,5 +14,5 @@ This research mainly includes the following analyses:
 
 If you use these scripts, please cite the paper below:
 
-Tian Li#, Hao Chen#, Nana Ma#, Dingkun Jiang, Jiacheng Wu, Xinfeng Zhang, et al, Fangjie Zhu*. "Specificity landscapes of 40 R2R3-MYBs reveal how paralogs target different *cis*-elements by homodimeric binding". ***iMeta***
+Tian Li#, Hao Chen#, Nana Ma#, Dingkun Jiang, Jiacheng Wu, Xinfeng Zhang, et al. "Specificity landscapes of 40 R2R3-MYBs reveal how paralogs target different *cis*-elements by homodimeric binding". ***iMeta***
 
