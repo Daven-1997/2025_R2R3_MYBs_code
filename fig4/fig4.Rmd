@@ -1,4 +1,4 @@
-# Precision-Recall Analysis (Figure 4C-E, S5D-E)
+# Precision-Recall Analysis (fig4C-E, S5D-E)
 # 定义函数计算PR曲线的Precision和Recall
 cppFunction('
     NumericMatrix calcPredictions(std::vector<double> Peak, std::vector<double> Non_Peak, std::vector<double> Thresh) {
