@@ -1,4 +1,4 @@
-# Dimeric Consensus Enrichment (Figure 2A和Figure S3A)
+# Dimeric Consensus Enrichment (fig2A和figS3A)
 dimer_enrich <- function(seqs, direct = c("DR", "IR", "ER"), half_pattern = "TTGAC", max_mismatch = 0, gap = 0:20, bk_div = TRUE, bk_div_pseudo = 200, isNeedShuffled = TRUE, shuffled_seqs = "seqs", shuffled_n = 1){
   if (bk_div) {if (isNeedShuffled) { # bk_div为TURE时，将目标序列Kmer频率除以背景序列Kmer频率，表明要计算的是富集程度；isNeedShuffled为TURE时，表明需要随机打乱背景序列，否则需要提供背景序列
     shuffled_seqs <- shuffle_sequences(DNAStringSet(seqs) %>% rep(shuffled_n))
@@ -63,7 +63,7 @@ dimer_enrich <- function(seqs, direct = c("DR", "IR", "ER"), half_pattern = "TTG
   lapply(direct, function(x){cnt_direction(direct = x)}) %>% set_names(direct) %>% largeListToDf() %>% mutate(gap = gap)
 }
 
-# Motif Frequency and Information Content (Figure 2C)
+# Motif Frequency and Information Content (fig2C)
 # 定义函数用于计算motif出现频率并标准化
 motif_freq_norm <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "scores")
 {
@@ -119,7 +119,7 @@ motif_freq_norm <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out =
 }
 
 # 定义函数计算motif出现频率及信息含量并指定绘图保存路径
-# (Figure 2C和Data S2)
+# (fig2C和Data S2)
 freqMeanICalFun <- function(Cleanfile, pwmlist, tf_name, p.cutoff = 1e-05, bg = "even",
                             out = "scores", freqColours = colorspace::sequential_hcl(9, "BluYl", rev = T),
                             width = 6, height = 12, ICColours = colorspace::sequential_hcl(9, "PinkYl", rev = T),
@@ -183,7 +183,7 @@ motif_enrich <- function (seqs, pwmlist, p.cutoff = 1e-05, bg = "even", out = "s
   return(list(motifEnrich = motifEnrich, motif_count = motif_ct, motif_count_bg = motif_ct_Shuffled))
 }
 
-# Dimeric Consensus Enrichment (DAPseq, Figure 2B)
+# Dimeric Consensus Enrichment (DAPseq, fig2B)
 dimer_enrich <- function(seqs, direct = c("DR", "IR", "ER"), half_pattern = "TTGAC", max_mismatch = 0, gap = 0:20, bk_div = TRUE, bk_div_pseudo = 200, isNeedShuffled = TRUE, shuffled_seqs = "seqs", shuffled_n = 1){
   if (bk_div) {if (isNeedShuffled) { # bk_div为TURE时，将目标序列Kmer频率除以背景序列Kmer频率，表明要计算的是富集程度；isNeedShuffled为TURE时，表明需要随机打乱背景序列，否则需要提供背景序列
     shuffled_seqs <- shuffle_sequences(DNAStringSet(seqs) %>% rep(shuffled_n))
